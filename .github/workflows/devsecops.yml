@@ -1,0 +1,58 @@
+name: Juice Shop CI/CD (Self-Hosted)
+on:
+  push:
+    branches: [build]
+
+jobs:
+  security-pipeline:
+    runs-on: [self-hosted, linux, k8s]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Login to Registry
+        run: echo "${{ secrets.DHUSERNAME }}" | docker login -u "${{ secrets.DHPASSWD }}" --password-stdin
+
+      - name: Build Image
+        run: docker build -t nordmyname/juice-shop:${{ github.sha }} .
+
+     # - name: Trivy Scan
+      #  run: |
+      #    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+       #     aquasec/trivy image --severity HIGH,CRITICAL --exit-code 1 nordmyname/juice-shop:${{ github.sha }}
+
+      - name: Trivy Scan (non-blocking)
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $PWD:/workspace \
+            aquasec/trivy image \
+            --severity HIGH,CRITICAL \
+            --format table \
+            --output /workspace/trivy-report.txt \
+            nordmyname/juice-shop:${{ github.sha }}
+      
+      - name: Upload Trivy Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt      
+      - name: Push to Registry
+        run: |
+          docker tag nordmyname/juice-shop:${{ github.sha }} nordmyname/juice-shop:latest
+          docker push nordmyname/juice-shop:${{ github.sha }}
+          docker push nordmyname/juice-shop:latest
+
+      - name: Deploy to K8s
+        run: |
+          kubectl create namespace juice-shop-test --dry-run=client -o yaml | kubectl apply -f -
+          # Update the deployment with the new image tag
+          kubectl set image deployment/juice-shop juice-shop=nordmyname/juice-shop:${{ github.sha }} -n juice-shop-test --record || \
+          kubectl apply -f k8s/juice-shop.yml -n juice-shop-test
+          kubectl rollout status deployment/juice-shop -n juice-shop-test
+
+      - name: OWASP ZAP Scan
+        run: |
+          # Use the Service IP or NodePort reachable by the runner
+          docker run --rm -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://juice-shop.juice-shop-test.svc.cluster.local -r report.html
