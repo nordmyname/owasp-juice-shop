@@ -59,14 +59,16 @@ jobs:
 
       - name: OWASP ZAP Baseline Scan (non-blocking)
         run: |
+          INGRESS_IP=$(kubectl get ingress juice-shop -n juice-shop-test -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
           docker run --rm \
-          --user root \
-          -v $PWD:/zap/wrk \
-          ghcr.io/zaproxy/zaproxy:stable \
-          zap-baseline.py \
-            -t http://juice-shop.juice-shop-test.svc.cluster.local \
-            -r zap-report.html \
-            -I
+            --user root \
+            --add-host juice-shop.local:$INGRESS_IP \
+            -v $PWD:/zap/wrk \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t http://juice-shop.local \
+              -r zap-report.html \
+              -I
       - name: Upload ZAP Report
         uses: actions/upload-artifact@v4
         with:
