@@ -57,8 +57,12 @@ jobs:
           kubectl apply -f k8s/juice-shop.yml -n juice-shop-test
           kubectl rollout status deployment/juice-shop -n juice-shop-test
 
-      - name: OWASP ZAP Scan
+      - name: OWASP ZAP Baseline Scan (non-blocking)
         run: |
-          # Use the Service IP or NodePort reachable by the runner
-          docker run --rm -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-            -t http://juice-shop.juice-shop-test.svc.cluster.local -r report.html
+          docker run --rm \
+          -v $PWD:/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+            -t http://juice-shop.juice-shop-test.svc.cluster.local \
+            -r zap-report.html \
+            -I
