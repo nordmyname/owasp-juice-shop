@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '0 18 * * 6'
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   zap_scan_juice_shop:
     runs-on: [self-hosted, appsec-lab]
@@ -18,6 +22,7 @@ jobs:
       - name: ZAP Scan - Juice Shop
         uses: zaproxy/action-baseline@7c4deb10e6261301961c86d65d54a516394f9aed # v0.14.0
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           target: 'http://juice-shop.appsec-lab-target.svc.cluster.local:3000'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a -j'
@@ -35,6 +40,7 @@ jobs:
       - name: ZAP Scan - WebGoat
         uses: zaproxy/action-baseline@7c4deb10e6261301961c86d65d54a516394f9aed # v0.14.0
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           target: 'http://webgoat.appsec-lab-target.svc.cluster.local:8080/WebGoat/'
           cmd_options: '-a -j'
           artifact_name: 'zap-webgoat-report'
